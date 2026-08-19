@@ -627,7 +627,12 @@ public final class MuesliController: NSObject {
         hotkeyMonitor.onCancel = { [weak self] in self?.handleCancel() }
         hotkeyMonitor.onToggleStart = { [weak self] in self?.handleToggleStart() }
         hotkeyMonitor.onToggleStop = { [weak self] in self?.handleToggleStop() }
-        hotkeyMonitor.doubleTapEnabled = config.enableDoubleTapDictation
+        hotkeyMonitor.onBecameHandsFree = { [weak self] in
+            guard let self else { return }
+            self.indicator.setToggleDictation(true, config: self.config)
+        }
+        hotkeyMonitor.doubleTapEnabled = false
+        hotkeyMonitor.activationMode = .hybrid
         configureHotkeyMonitorTiming()
         computerUseHotkeyMonitor.onPrepare = { [weak self] in self?.handleComputerUsePrepare() }
         computerUseHotkeyMonitor.onStart = { [weak self] in self?.handleComputerUseStart() }
@@ -1502,7 +1507,8 @@ public final class MuesliController: NSObject {
         statusBarController?.refresh()
         statusBarController?.refreshIcon()
         indicator.refreshIcon()
-        hotkeyMonitor.doubleTapEnabled = config.enableDoubleTapDictation
+        hotkeyMonitor.doubleTapEnabled = false
+        hotkeyMonitor.activationMode = .hybrid
         computerUseHotkeyMonitor.doubleTapEnabled = config.enableDoubleTapDictation
         if hotkeyTriggerThresholdChanged {
             configureHotkeyMonitorTiming()
@@ -3663,6 +3669,7 @@ public final class MuesliController: NSObject {
             config.enableComputerUseHotkey = false
             config.meetingRecordingHotkey = .meetingRecordingDefault
             config.enableMeetingRecordingHotkey = false
+            config.dictationHotkeyMode = .default
             config.hotkeyTriggerThresholdMS = HotkeyTriggerTiming.defaultThresholdMilliseconds
             config.computerUseHotkeyTriggerThresholdMS = HotkeyTriggerTiming.defaultThresholdMilliseconds
             config.meetingRecordingHotkeyTriggerThresholdMS = HotkeyTriggerTiming.defaultMeetingThresholdMilliseconds
@@ -3815,6 +3822,8 @@ public final class MuesliController: NSObject {
         if let keyCode {
             hotkeyMonitor.configure(keyCode: keyCode)
         }
+        hotkeyMonitor.activationMode = .hybrid
+        hotkeyMonitor.doubleTapEnabled = false
         hotkeyMonitor.start()
         startComputerUseHotkeyMonitorIfNeeded()
     }

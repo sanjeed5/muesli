@@ -49,17 +49,13 @@ struct ShortcutsView: View {
 
     private var dictationShortcutSection: some View {
         VStack(alignment: .leading, spacing: MuesliTheme.spacing16) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: MuesliTheme.spacing4) {
-                    Text("Push to Talk")
-                        .font(MuesliTheme.headline())
-                        .foregroundStyle(MuesliTheme.textPrimary)
-                    Text("Hold to record, release to transcribe")
-                        .font(MuesliTheme.caption())
-                        .foregroundStyle(MuesliTheme.textSecondary)
-                }
-                Spacer()
-                hotkeyBadge(appState.config.dictationHotkey)
+            VStack(alignment: .leading, spacing: MuesliTheme.spacing4) {
+                Text("Dictation")
+                    .font(MuesliTheme.headline())
+                    .foregroundStyle(MuesliTheme.textPrimary)
+                Text(HotkeyActivationMode.hybrid.settingsSubtitle)
+                    .font(MuesliTheme.caption())
+                    .foregroundStyle(MuesliTheme.textSecondary)
             }
 
             Divider()
@@ -317,7 +313,7 @@ struct ShortcutsView: View {
                     Text("Hands-Free Mode")
                         .font(MuesliTheme.headline())
                         .foregroundStyle(MuesliTheme.textPrimary)
-                    Text("Double-tap dictation or CUA to start, tap again to stop")
+                    Text("Double-tap Computer Use to start, tap again to stop")
                         .font(MuesliTheme.caption())
                         .foregroundStyle(MuesliTheme.textSecondary)
                 }

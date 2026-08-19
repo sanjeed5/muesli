@@ -604,11 +604,14 @@ else
   # keep returning false even after the user grants permission, so onboarding stalls.
   #
   # Note: ad-hoc signatures have no stable designated requirement, so the cdhash changes on
-  # every rebuild and macOS privacy grants must be re-approved after each dev build. For grants
-  # that persist across rebuilds, create a self-signed code-signing certificate and pass its name
-  # via MUESLI_SIGN_IDENTITY. No hardened runtime here: ad-hoc has no Team ID, so library
-  # validation would block dlopen of the bundled frameworks/dylibs.
+  # every rebuild and macOS privacy grants must be re-approved after each dev build.
+  # Prefer a shared personal local identity (created by
+  # scripts/ensure_local_dev_identity.sh) so TCC grants persist across
+  # rebuilds and across local apps. No hardened runtime here: ad-hoc has
+  # no Team ID, so library validation would block dlopen of the bundled
+  # frameworks/dylibs.
   LOCAL_SIGN_IDENTITY="-"
+  SHARED_LOCAL_IDENTITY="${LOCAL_DEV_SIGN_IDENTITY:-${MUESLI_LOCAL_DEV_IDENTITY:-Sanjeed Local Dev}}"
   if [[ -n "${MUESLI_SIGN_IDENTITY:-}" ]]; then
     LOCAL_SIGN_IDENTITY="$MUESLI_SIGN_IDENTITY"
     if ! security find-identity -v -p codesigning | grep -Fq "$LOCAL_SIGN_IDENTITY"; then
@@ -616,6 +619,9 @@ else
       exit 1
     fi
     echo "Local signing with MUESLI_SIGN_IDENTITY=$LOCAL_SIGN_IDENTITY (MUESLI_SKIP_SIGN=1)..."
+  elif security find-identity -v -p codesigning | grep -Fq "$SHARED_LOCAL_IDENTITY"; then
+    LOCAL_SIGN_IDENTITY="$SHARED_LOCAL_IDENTITY"
+    echo "Local signing with $LOCAL_SIGN_IDENTITY (stable TCC identity)..."
   else
     echo "Ad-hoc signing for local dev (MUESLI_SKIP_SIGN=1; no Developer ID)..."
   fi
@@ -650,12 +656,16 @@ else
   # Sign the bundle last so the Info.plist binding / identity stick.
   codesign --force --sign "$LOCAL_SIGN_IDENTITY" --entitlements "$ENTITLEMENTS" "$APP_DIR"
 
-  echo "Verifying ad-hoc signature..."
+  echo "Verifying local signature..."
   if ! codesign --verify --deep --strict "$APP_DIR" 2>&1; then
-    echo "ERROR: ad-hoc signature verification failed" >&2
+    echo "ERROR: local signature verification failed" >&2
     exit 1
   fi
-  echo "  Local signature valid. Re-approve macOS privacy permissions if prompted after ad-hoc rebuilds."
+  if [[ "$LOCAL_SIGN_IDENTITY" == "-" ]]; then
+    echo "  Ad-hoc signature valid. Re-approve macOS privacy permissions if prompted after rebuilds."
+  else
+    echo "  Local signature valid ($LOCAL_SIGN_IDENTITY). TCC grants persist across rebuilds."
+  fi
 fi
 
 rm -rf "$STAGED_APP_DIR"

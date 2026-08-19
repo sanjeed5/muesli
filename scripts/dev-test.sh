@@ -9,8 +9,11 @@ set -euo pipefail
 # - Dev builds default to local-only entitlements to preserve existing TCC
 #   permissions and avoid requiring Apple Developer profiles
 # - CloudKit/APNs dev signing is opt-in with --cloud-entitlements
-# - External contributors can set MUESLI_SKIP_SIGN=1 to build without the
-#   maintainer signing certificate
+# - Local-only builds sign with a shared personal identity (default
+#   "Sanjeed Local Dev") so macOS privacy grants persist across rebuilds
+#   and can be reused by other local apps
+# - External contributors without Developer ID still get that local identity
+#   (or ad-hoc if certificate creation is unavailable)
 # - Uses a shared, worktree-isolated SwiftPM scratch path by default; set
 #   MUESLI_DISABLE_SWIFTPM_SCRATCH_PATH=1 to use package-local .build instead
 # - Installs to /Applications/MuesliDev*.app
@@ -152,12 +155,14 @@ fi
 
 use_local_only_entitlements() {
   RESOLVED_PROVISIONING_PROFILE=""
-  RESOLVED_SIGN_IDENTITY=""
   RESOLVED_CODESIGN_TIMESTAMP=""
+  RESOLVED_SIGN_IDENTITY="$("$ROOT/scripts/ensure_local_dev_identity.sh")"
   BUILD_ENV+=(
     MUESLI_ENTITLEMENTS="$ROOT/scripts/MuesliLocalOnly.entitlements"
     MUESLI_PROVISIONING_PROFILE=""
     MUESLI_APS_ENVIRONMENT=""
+    MUESLI_SKIP_SIGN=1
+    MUESLI_SIGN_IDENTITY="$RESOLVED_SIGN_IDENTITY"
   )
 }
 

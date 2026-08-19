@@ -611,7 +611,7 @@ else
   # no Team ID, so library validation would block dlopen of the bundled
   # frameworks/dylibs.
   LOCAL_SIGN_IDENTITY="-"
-  SHARED_LOCAL_IDENTITY="${LOCAL_DEV_SIGN_IDENTITY:-${MUESLI_LOCAL_DEV_IDENTITY:-Sanjeed Local Dev}}"
+  SHARED_LOCAL_IDENTITY="${LOCAL_DEV_SIGN_IDENTITY:-${MUESLI_LOCAL_DEV_IDENTITY:-Muesli Local Dev}}"
   if [[ -n "${MUESLI_SIGN_IDENTITY:-}" ]]; then
     LOCAL_SIGN_IDENTITY="$MUESLI_SIGN_IDENTITY"
     if ! security find-identity -v -p codesigning | grep -Fq "$LOCAL_SIGN_IDENTITY"; then

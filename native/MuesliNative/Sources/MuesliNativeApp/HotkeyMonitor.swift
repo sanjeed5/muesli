@@ -113,6 +113,7 @@ final class HotkeyMonitor {
     private var lastTapWasShort = false
     private var toggleActive = false
     private var pressStartedAt: Date?
+    private var pressDurationAtRelease: TimeInterval?
 
     private var prepareDelay: TimeInterval
     private var startDelay: TimeInterval
@@ -200,6 +201,7 @@ final class HotkeyMonitor {
         combinationKeyDown = false
         combinationTriggered = false
         pressStartedAt = nil
+        pressDurationAtRelease = nil
     }
 
     func configure(keyCode: UInt16) {
@@ -266,6 +268,7 @@ final class HotkeyMonitor {
         lastTapWasShort = false
         lastTapUpTime = nil
         pressStartedAt = nil
+        pressDurationAtRelease = nil
         cancelTimers()
 
         if wasToggleActive || (wasActive && activationMode.startsOnTap) {
@@ -292,6 +295,17 @@ final class HotkeyMonitor {
             toggleActive = false
             fputs("[hotkey] toggle cancelled externally\n", stderr)
         }
+    }
+
+    /// Call when `onToggleStart` is rejected so a failed press cannot become
+    /// hands-free or stop-on-release.
+    func markHybridStartFailed() {
+        active = false
+        toggleActive = false
+        prepared = false
+        pressStartedAt = nil
+        pressDurationAtRelease = nil
+        fputs("[hotkey] hybrid start rejected\n", stderr)
     }
 
     var isRunning: Bool {
@@ -608,12 +622,14 @@ final class HotkeyMonitor {
     private func scheduleHybridRelease(wasDown: Bool) {
         guard wasDown, !otherKeyPressed else {
             pressStartedAt = nil
+            pressDurationAtRelease = nil
             if otherKeyPressed {
                 lastTapWasShort = false
             }
             return
         }
 
+        pressDurationAtRelease = pressStartedAt.map { now().timeIntervalSince($0) }
         releaseWorkItem?.cancel()
         let item = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -629,17 +645,20 @@ final class HotkeyMonitor {
 
         if toggleActive {
             pressStartedAt = nil
+            pressDurationAtRelease = nil
             return
         }
 
         if otherKeyPressed {
             lastTapWasShort = false
             pressStartedAt = nil
+            pressDurationAtRelease = nil
             return
         }
 
-        let duration = pressStartedAt.map { now().timeIntervalSince($0) } ?? 0
+        let duration = pressDurationAtRelease ?? pressStartedAt.map { now().timeIntervalSince($0) } ?? 0
         pressStartedAt = nil
+        pressDurationAtRelease = nil
 
         if active && duration >= startDelay {
             fputs("[hotkey] hybrid hold → push-to-talk stop\n", stderr)
@@ -662,6 +681,7 @@ final class HotkeyMonitor {
         otherKeyPressed = true
         lastTapWasShort = false
         pressStartedAt = nil
+        pressDurationAtRelease = nil
         let wasArmed = armed
         armed = false
         cancelTimers()

@@ -2299,6 +2299,86 @@ struct HotkeyMonitorTests {
         #expect(!monitor.isToggleRecording)
     }
 
+    @Test("hybrid release just under hold threshold stays hands-free")
+    @MainActor
+    func hybridReleaseJustUnderHoldThresholdStaysHandsFree() {
+        let scheduler = ManualHotkeyScheduler()
+        let monitor = scheduler.makeMonitor(startDelay: 0.25)
+        monitor.activationMode = .hybrid
+        var toggleStopCount = 0
+        monitor.onToggleStart = {}
+        monitor.onToggleStop = { toggleStopCount += 1 }
+
+        monitor.handleFlagsChanged(keyCode: 55, flags: .command)
+        scheduler.advance(by: 0.24)
+        monitor.handleFlagsChanged(keyCode: 55, flags: [])
+        scheduler.advance(by: HotkeyTriggerTiming.hybridReleaseDebounce)
+
+        #expect(toggleStopCount == 0)
+        #expect(monitor.isToggleRecording)
+    }
+
+    @Test("hybrid release at hold threshold stops on release")
+    @MainActor
+    func hybridReleaseAtHoldThresholdStopsOnRelease() {
+        let scheduler = ManualHotkeyScheduler()
+        let monitor = scheduler.makeMonitor(startDelay: 0.25)
+        monitor.activationMode = .hybrid
+        var toggleStopCount = 0
+        monitor.onToggleStart = {}
+        monitor.onToggleStop = { toggleStopCount += 1 }
+
+        monitor.handleFlagsChanged(keyCode: 55, flags: .command)
+        scheduler.advance(by: 0.25)
+        monitor.handleFlagsChanged(keyCode: 55, flags: [])
+        scheduler.advance(by: HotkeyTriggerTiming.hybridReleaseDebounce)
+
+        #expect(toggleStopCount == 1)
+        #expect(!monitor.isToggleRecording)
+    }
+
+    @Test("hybrid ignores double-tap when it is enabled")
+    @MainActor
+    func hybridIgnoresDoubleTapWhenEnabled() {
+        let scheduler = ManualHotkeyScheduler()
+        let monitor = scheduler.makeMonitor(startDelay: 0.25, doubleTapWindow: 0.35)
+        monitor.activationMode = .hybrid
+        monitor.doubleTapEnabled = true
+        var toggleStartCount = 0
+        var toggleStopCount = 0
+        monitor.onToggleStart = { toggleStartCount += 1 }
+        monitor.onToggleStop = { toggleStopCount += 1 }
+
+        monitor.handleFlagsChanged(keyCode: 55, flags: .command)
+        monitor.handleFlagsChanged(keyCode: 55, flags: [])
+        scheduler.advance(by: HotkeyTriggerTiming.hybridReleaseDebounce)
+        #expect(monitor.isToggleRecording)
+
+        monitor.handleFlagsChanged(keyCode: 55, flags: .command)
+
+        #expect(toggleStartCount == 1)
+        #expect(toggleStopCount == 1)
+        #expect(!monitor.isToggleRecording)
+    }
+
+    @Test("failed hybrid start does not stay hands-free")
+    @MainActor
+    func failedHybridStartDoesNotStayHandsFree() {
+        let scheduler = ManualHotkeyScheduler()
+        let monitor = scheduler.makeMonitor(startDelay: 0.25)
+        monitor.activationMode = .hybrid
+        var becameHandsFree = 0
+        monitor.onToggleStart = { monitor.markHybridStartFailed() }
+        monitor.onBecameHandsFree = { becameHandsFree += 1 }
+
+        monitor.handleFlagsChanged(keyCode: 55, flags: .command)
+        monitor.handleFlagsChanged(keyCode: 55, flags: [])
+        scheduler.advance(by: HotkeyTriggerTiming.hybridReleaseDebounce)
+
+        #expect(becameHandsFree == 0)
+        #expect(!monitor.isToggleRecording)
+    }
+
     @Test("hybrid other key after start transcribes instead of discarding")
     @MainActor
     func hybridOtherKeyAfterStartTranscribesInsteadOfDiscarding() {

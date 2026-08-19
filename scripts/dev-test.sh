@@ -9,11 +9,10 @@ set -euo pipefail
 # - Dev builds default to local-only entitlements to preserve existing TCC
 #   permissions and avoid requiring Apple Developer profiles
 # - CloudKit/APNs dev signing is opt-in with --cloud-entitlements
-# - Local-only builds sign with a shared personal identity (default
-#   "Sanjeed Local Dev") so macOS privacy grants persist across rebuilds
-#   and can be reused by other local apps
-# - External contributors without Developer ID still get that local identity
-#   (or ad-hoc if certificate creation is unavailable)
+# - Local-only builds sign with a stable "Muesli Local Dev" identity so
+#   macOS privacy grants persist across rebuilds
+# - Override with MUESLI_SIGN_IDENTITY or LOCAL_DEV_SIGN_IDENTITY
+# - Falls back to ad-hoc if certificate creation is unavailable
 # - Uses a shared, worktree-isolated SwiftPM scratch path by default; set
 #   MUESLI_DISABLE_SWIFTPM_SCRATCH_PATH=1 to use package-local .build instead
 # - Installs to /Applications/MuesliDev*.app
@@ -156,7 +155,14 @@ fi
 use_local_only_entitlements() {
   RESOLVED_PROVISIONING_PROFILE=""
   RESOLVED_CODESIGN_TIMESTAMP=""
-  RESOLVED_SIGN_IDENTITY="$("$ROOT/scripts/ensure_local_dev_identity.sh")"
+  if [[ -n "${MUESLI_SIGN_IDENTITY:-}" ]]; then
+    RESOLVED_SIGN_IDENTITY="$MUESLI_SIGN_IDENTITY"
+  elif RESOLVED_SIGN_IDENTITY="$("$ROOT/scripts/ensure_local_dev_identity.sh")"; then
+    :
+  else
+    echo "Warning: could not create a local signing identity; using ad-hoc." >&2
+    RESOLVED_SIGN_IDENTITY="-"
+  fi
   BUILD_ENV+=(
     MUESLI_ENTITLEMENTS="$ROOT/scripts/MuesliLocalOnly.entitlements"
     MUESLI_PROVISIONING_PROFILE=""

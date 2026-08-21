@@ -438,6 +438,7 @@ public final class MuesliController: NSObject {
     private var currentDictationOutputMode: DictationOutputMode = .paste
     private var pendingDictationStopStartedAt: Date?
     private var pendingDictationStopSessionID: UUID?
+    private var pendingDictationDiscardShortRecordings = true
     private var pendingReleaseSoundSessionID: UUID?
     private var pendingPreparingIndicatorWorkItem: DispatchWorkItem?
     private var activeComputerUseAudioSessionID: UUID?
@@ -636,8 +637,7 @@ public final class MuesliController: NSObject {
             guard let self else { return }
             self.indicator.setToggleDictation(true, config: self.config)
         }
-        hotkeyMonitor.doubleTapEnabled = false
-        hotkeyMonitor.activationMode = .hybrid
+        configureDictationHotkeyMonitor()
         configureHotkeyMonitorTiming()
         computerUseHotkeyMonitor.onPrepare = { [weak self] in self?.handleComputerUsePrepare() }
         computerUseHotkeyMonitor.onStart = { [weak self] in self?.handleComputerUseStart() }
@@ -1512,8 +1512,7 @@ public final class MuesliController: NSObject {
         statusBarController?.refresh()
         statusBarController?.refreshIcon()
         indicator.refreshIcon()
-        hotkeyMonitor.doubleTapEnabled = false
-        hotkeyMonitor.activationMode = .hybrid
+        configureDictationHotkeyMonitor()
         computerUseHotkeyMonitor.doubleTapEnabled = config.enableDoubleTapDictation
         if hotkeyTriggerThresholdChanged {
             configureHotkeyMonitorTiming()
@@ -3674,7 +3673,6 @@ public final class MuesliController: NSObject {
             config.enableComputerUseHotkey = false
             config.meetingRecordingHotkey = .meetingRecordingDefault
             config.enableMeetingRecordingHotkey = false
-            config.dictationHotkeyMode = .default
             config.hotkeyTriggerThresholdMS = HotkeyTriggerTiming.defaultThresholdMilliseconds
             config.computerUseHotkeyTriggerThresholdMS = HotkeyTriggerTiming.defaultThresholdMilliseconds
             config.meetingRecordingHotkeyTriggerThresholdMS = HotkeyTriggerTiming.defaultMeetingThresholdMilliseconds
@@ -3827,8 +3825,7 @@ public final class MuesliController: NSObject {
         if let keyCode {
             hotkeyMonitor.configure(keyCode: keyCode)
         }
-        hotkeyMonitor.activationMode = .hybrid
-        hotkeyMonitor.doubleTapEnabled = false
+        configureDictationHotkeyMonitor()
         hotkeyMonitor.start()
         startComputerUseHotkeyMonitorIfNeeded()
     }
@@ -7270,6 +7267,11 @@ public final class MuesliController: NSObject {
         startComputerUseHotkeyMonitorIfNeeded()
     }
 
+    private func configureDictationHotkeyMonitor() {
+        hotkeyMonitor.startsOnTap = true
+        hotkeyMonitor.doubleTapEnabled = false
+    }
+
     private func configureHotkeyMonitorTiming() {
         hotkeyMonitor.configureTriggerThreshold(milliseconds: config.hotkeyTriggerThresholdMS)
         computerUseHotkeyMonitor.configureTriggerThreshold(milliseconds: config.computerUseHotkeyTriggerThresholdMS)
@@ -8449,9 +8451,15 @@ public final class MuesliController: NSObject {
                 break
             }
             let startedAt = pendingDictationStopStartedAt ?? dictationStartedAt ?? Date()
+            let discardShortRecordings = pendingDictationDiscardShortRecordings
             pendingDictationStopSessionID = nil
             pendingDictationStopStartedAt = nil
-            finishStandardDictationStop(wavURL: wavURL, startedAt: startedAt)
+            pendingDictationDiscardShortRecordings = true
+            finishStandardDictationStop(
+                wavURL: wavURL,
+                startedAt: startedAt,
+                discardShortRecordings: discardShortRecordings
+            )
         case .audioRestored(let eventSessionID):
             guard pendingReleaseSoundSessionID == eventSessionID else { break }
             pendingReleaseSoundSessionID = nil
@@ -8475,6 +8483,7 @@ public final class MuesliController: NSObject {
             dictationStartedAt = nil
             pendingDictationStopSessionID = nil
             pendingDictationStopStartedAt = nil
+            pendingDictationDiscardShortRecordings = true
             pendingReleaseSoundSessionID = nil
             clearCapturedDictationSessionContext()
             setState(.idle)
@@ -8781,6 +8790,7 @@ public final class MuesliController: NSObject {
         dictationStartedAt = nil
         pendingDictationStopSessionID = nil
         pendingDictationStopStartedAt = nil
+        pendingDictationDiscardShortRecordings = true
         pendingReleaseSoundSessionID = nil
         setState(.idle)
         meetingMonitor.resumeAfterCooldown()
@@ -8803,7 +8813,7 @@ public final class MuesliController: NSObject {
         markDictationLatency("toggle_start")
         meetingMonitor.suppressWhileActive()
         beginDictationOutput(mode: outputMode)
-        dictationStartedAt = nil
+        dictationStartedAt = Date()
         clearCapturedDictationSessionContext()
         captureDictationCorrectionTargetApp()
         setState(.preparing)
@@ -8815,7 +8825,6 @@ public final class MuesliController: NSObject {
                 isNemotron35Streaming = true
                 nemotron35StreamingSessionID = sessionID
                 previousStreamText = ""
-                dictationStartedAt = Date()
                 markDictationLatency("sound_start_requested:nemotron-toggle")
                 SoundController.playDictationStart(enabled: shouldPlayDictationLifecycleSounds && !isDictationTestMode)
                 dictationAudioSessionManager.beginExternalSession(
@@ -8843,7 +8852,7 @@ public final class MuesliController: NSObject {
     private func handleToggleStop() {
         fputs("[muesli-native] toggle dictation stop\n", stderr)
         indicator.isToggleDictation = false
-        handleStop()
+        handleStop(discardShortRecordings: false)
     }
 
     func toggleVoiceNoteRecording() {
@@ -8905,7 +8914,7 @@ public final class MuesliController: NSObject {
         return true
     }
 
-    private func handleStop() {
+    private func handleStop(discardShortRecordings: Bool = true) {
         if isMeetingRecording() {
             cancelDictationAudioSessionForMeetingRecordingIfNeeded()
             return
@@ -8951,6 +8960,7 @@ public final class MuesliController: NSObject {
             ? pendingDictationStopSessionID
             : nil
         pendingDictationStopStartedAt = startedAt
+        pendingDictationDiscardShortRecordings = discardShortRecordings
         dictationAudioSessionManager.stop()
     }
 
@@ -8983,6 +8993,7 @@ public final class MuesliController: NSObject {
         clearCapturedDictationSessionContext()
         pendingDictationStopSessionID = nil
         pendingDictationStopStartedAt = nil
+        pendingDictationDiscardShortRecordings = true
         pendingReleaseSoundSessionID = nil
         resetDictationOutputMode()
         setState(.idle)
@@ -9095,7 +9106,11 @@ public final class MuesliController: NSObject {
         ])
     }
 
-    private func finishStandardDictationStop(wavURL stoppedWavURL: URL?, startedAt: Date) {
+    private func finishStandardDictationStop(
+        wavURL stoppedWavURL: URL?,
+        startedAt: Date,
+        discardShortRecordings: Bool = true
+    ) {
         markDictationLatency("stop_finished")
         guard let wavURL = stoppedWavURL else {
             fputs("[muesli-native] stop without wav\n", stderr)
@@ -9108,7 +9123,7 @@ public final class MuesliController: NSObject {
             return
         }
         let duration = max(Date().timeIntervalSince(startedAt), 0)
-        if duration < 0.3 {
+        if discardShortRecordings && duration < 0.3 {
             fputs("[muesli-native] discarded short recording\n", stderr)
             try? FileManager.default.removeItem(at: wavURL)
             if isDictationTestMode {

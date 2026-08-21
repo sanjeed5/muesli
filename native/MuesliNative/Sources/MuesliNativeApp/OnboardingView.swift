@@ -1212,7 +1212,7 @@ struct OnboardingView: View {
                     .font(MuesliTheme.title1())
                     .foregroundStyle(MuesliTheme.textPrimary)
 
-                Text("Choose the key you'll use to dictate. Tap to start and tap again to stop, or hold to talk and release to transcribe.")
+                Text("Choose the key you'll use to dictate. \(DictationHotkeyCopy.settingsSubtitle)")
                     .font(MuesliTheme.body())
                     .foregroundStyle(MuesliTheme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -1383,7 +1383,7 @@ struct OnboardingView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "keyboard")
                                 .font(.system(size: 14))
-                            Text("Tap or hold \(selectedHotkey.label) to start")
+                            Text(DictationHotkeyCopy.idleHoverPrompt(hotkeyLabel: selectedHotkey.label))
                                 .font(MuesliTheme.body())
                         }
                         .foregroundStyle(MuesliTheme.textTertiary)

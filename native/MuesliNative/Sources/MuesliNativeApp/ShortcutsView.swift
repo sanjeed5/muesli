@@ -53,7 +53,7 @@ struct ShortcutsView: View {
                 Text("Dictation")
                     .font(MuesliTheme.headline())
                     .foregroundStyle(MuesliTheme.textPrimary)
-                Text(HotkeyActivationMode.hybrid.settingsSubtitle)
+                Text(DictationHotkeyCopy.settingsSubtitle)
                     .font(MuesliTheme.caption())
                     .foregroundStyle(MuesliTheme.textSecondary)
             }

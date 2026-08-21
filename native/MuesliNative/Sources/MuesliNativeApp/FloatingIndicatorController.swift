@@ -1581,8 +1581,7 @@ final class FloatingIndicatorController: NSObject {
             size = isHovered
                 ? Self.idleHoverPillSize(
                     hotkeyLabel: config.dictationHotkey.label,
-                    screenWidth: screen.width,
-                    mode: .hybrid
+                    screenWidth: screen.width
                 )
                 : NSSize(width: 44, height: 28)
         case .preparing: size = NSSize(width: 76, height: 22)
@@ -1648,7 +1647,7 @@ final class FloatingIndicatorController: NSObject {
                 .clear,
                 .colorWith(hex: 0xFFFFFF, alpha: isHovered ? 0.14 : 0.22),
                 "",
-                isHovered ? HotkeyActivationMode.hybrid.idleHoverPrompt(hotkeyLabel: config.dictationHotkey.label) : "",
+                isHovered ? DictationHotkeyCopy.idleHoverPrompt(hotkeyLabel: config.dictationHotkey.label) : "",
                 .colorWith(hex: 0xFFFFFF, alpha: 0.75),
                 .colorWith(hex: 0xFFFFFF, alpha: 0.75),
                 isHovered ? 1.0 : 0.90
@@ -1754,12 +1753,8 @@ final class FloatingIndicatorController: NSObject {
         transcribingPillSize(title: title, screenWidth: screenWidth)
     }
 
-    static func idleHoverPillSize(
-        hotkeyLabel: String,
-        screenWidth: CGFloat,
-        mode: HotkeyActivationMode = .hybrid
-    ) -> NSSize {
-        let title = mode.idleHoverPrompt(hotkeyLabel: hotkeyLabel)
+    static func idleHoverPillSize(hotkeyLabel: String, screenWidth: CGFloat) -> NSSize {
+        let title = DictationHotkeyCopy.idleHoverPrompt(hotkeyLabel: hotkeyLabel)
         let font = NSFont.systemFont(ofSize: 11, weight: .regular)
         let textWidth = ceil((title as NSString).size(withAttributes: [.font: font]).width)
         let preferredWidth = 42 + textWidth + 22

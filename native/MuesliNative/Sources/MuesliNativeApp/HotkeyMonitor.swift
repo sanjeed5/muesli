@@ -3,50 +3,12 @@ import ApplicationServices
 import Foundation
 import MuesliCore
 
-enum HotkeyActivationMode: String, CaseIterable, Codable, Sendable {
-    case hybrid
-    case holdToTalk = "hold_to_talk"
-    case toggle
+enum DictationHotkeyCopy {
+    static let settingsSubtitle =
+        "Tap to start, tap again to stop. Hold to talk, release to transcribe."
 
-    /// Dictation uses one shortcut: tap to start/stop, hold to talk.
-    static let `default`: HotkeyActivationMode = .hybrid
-
-    var displayName: String {
-        switch self {
-        case .hybrid: return "Hybrid"
-        case .holdToTalk: return "Push to Talk"
-        case .toggle: return "Toggle"
-        }
-    }
-
-    var settingsSubtitle: String {
-        switch self {
-        case .hybrid:
-            return "Tap to start, tap again to stop. Hold to talk, release to transcribe."
-        case .holdToTalk:
-            return "Hold to record, release to transcribe"
-        case .toggle:
-            return "Tap to start, tap again to stop"
-        }
-    }
-
-    var startsOnTap: Bool {
-        self == .hybrid || self == .toggle
-    }
-
-    var usesDoubleTap: Bool {
-        self == .holdToTalk
-    }
-
-    func idleHoverPrompt(hotkeyLabel: String) -> String {
-        switch self {
-        case .hybrid:
-            return "Tap or hold \(hotkeyLabel) to dictate"
-        case .holdToTalk:
-            return "Hold \(hotkeyLabel) to dictate"
-        case .toggle:
-            return "Tap \(hotkeyLabel) to dictate"
-        }
+    static func idleHoverPrompt(hotkeyLabel: String) -> String {
+        "Tap or hold \(hotkeyLabel) to dictate"
     }
 }
 
@@ -83,7 +45,7 @@ final class HotkeyMonitor {
     var onBecameHandsFree: (() -> Void)?
     var targetKeyCode: UInt16 = 55
     var doubleTapEnabled: Bool = true
-    var activationMode: HotkeyActivationMode = .holdToTalk
+    var startsOnTap: Bool = false
 
     // Combination mode (e.g. Cmd+Shift+R)
     var combinationModifiers: NSEvent.ModifierFlags?
@@ -113,7 +75,6 @@ final class HotkeyMonitor {
     private var lastTapWasShort = false
     private var toggleActive = false
     private var pressStartedAt: Date?
-    private var pressDurationAtRelease: TimeInterval?
 
     private var prepareDelay: TimeInterval
     private var startDelay: TimeInterval
@@ -201,7 +162,6 @@ final class HotkeyMonitor {
         combinationKeyDown = false
         combinationTriggered = false
         pressStartedAt = nil
-        pressDurationAtRelease = nil
     }
 
     func configure(keyCode: UInt16) {
@@ -268,10 +228,9 @@ final class HotkeyMonitor {
         lastTapWasShort = false
         lastTapUpTime = nil
         pressStartedAt = nil
-        pressDurationAtRelease = nil
         cancelTimers()
 
-        if wasToggleActive || (wasActive && activationMode.startsOnTap) {
+        if wasToggleActive || (wasActive && startsOnTap) {
             onToggleStop?()
         } else if wasActive {
             onStop?()
@@ -304,7 +263,6 @@ final class HotkeyMonitor {
         toggleActive = false
         prepared = false
         pressStartedAt = nil
-        pressDurationAtRelease = nil
         fputs("[hotkey] hybrid start rejected\n", stderr)
     }
 
@@ -317,7 +275,7 @@ final class HotkeyMonitor {
     }
 
     private var isDoubleTapActive: Bool {
-        doubleTapEnabled && activationMode.usesDoubleTap
+        doubleTapEnabled && !startsOnTap
     }
 
     @discardableResult
@@ -500,7 +458,7 @@ final class HotkeyMonitor {
                     }
 
                     pressStartedAt = now()
-                    if activationMode.startsOnTap {
+                    if startsOnTap {
                         beginHybridPress()
                         return
                     }
@@ -518,7 +476,7 @@ final class HotkeyMonitor {
                 targetKeyDown = false
                 armed = false
 
-                if activationMode.startsOnTap {
+                if startsOnTap {
                     scheduleHybridRelease(wasDown: wasDown)
                     return
                 }
@@ -555,7 +513,7 @@ final class HotkeyMonitor {
                     }
                 }
             }
-        } else if targetKeyDown && !toggleActive {
+        } else if targetKeyDown && !toggleActive && !startsOnTap {
             fputs("[hotkey] canceled by other modifier key \(keyCode)\n", stderr)
             interruptActivePress()
         }
@@ -622,43 +580,35 @@ final class HotkeyMonitor {
     private func scheduleHybridRelease(wasDown: Bool) {
         guard wasDown, !otherKeyPressed else {
             pressStartedAt = nil
-            pressDurationAtRelease = nil
             if otherKeyPressed {
                 lastTapWasShort = false
             }
             return
         }
 
-        pressDurationAtRelease = pressStartedAt.map { now().timeIntervalSince($0) }
+        let duration = pressStartedAt.map { now().timeIntervalSince($0) } ?? 0
         releaseWorkItem?.cancel()
         let item = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.releaseWorkItem = nil
-            self.finishHybridRelease()
+            self.pressStartedAt = nil
+            self.finishHybridRelease(duration: duration)
         }
         releaseWorkItem = item
         scheduleAfter(HotkeyTriggerTiming.hybridReleaseDebounce, item)
     }
 
-    private func finishHybridRelease() {
+    private func finishHybridRelease(duration: TimeInterval) {
         guard !targetKeyDown else { return }
 
         if toggleActive {
-            pressStartedAt = nil
-            pressDurationAtRelease = nil
             return
         }
 
         if otherKeyPressed {
             lastTapWasShort = false
-            pressStartedAt = nil
-            pressDurationAtRelease = nil
             return
         }
-
-        let duration = pressDurationAtRelease ?? pressStartedAt.map { now().timeIntervalSince($0) } ?? 0
-        pressStartedAt = nil
-        pressDurationAtRelease = nil
 
         if active && duration >= startDelay {
             fputs("[hotkey] hybrid hold → push-to-talk stop\n", stderr)
@@ -681,7 +631,6 @@ final class HotkeyMonitor {
         otherKeyPressed = true
         lastTapWasShort = false
         pressStartedAt = nil
-        pressDurationAtRelease = nil
         let wasArmed = armed
         armed = false
         cancelTimers()
@@ -690,7 +639,7 @@ final class HotkeyMonitor {
             prepared = false
             toggleActive = false
             fputs("[hotkey] interrupted after start → stop\n", stderr)
-            if activationMode.startsOnTap {
+            if startsOnTap {
                 onToggleStop?()
             } else {
                 onStop?()

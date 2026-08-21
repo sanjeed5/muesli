@@ -8,8 +8,19 @@ set -euo pipefail
 #
 # Override with LOCAL_DEV_SIGN_IDENTITY or MUESLI_LOCAL_DEV_IDENTITY.
 
-IDENTITY_NAME="${LOCAL_DEV_SIGN_IDENTITY:-${MUESLI_LOCAL_DEV_IDENTITY:-Muesli Local Dev}}"
+# Prefer an already-granted personal identity when one exists. Rotating from
+# "Sanjeed Local Dev" to a newly created "Muesli Local Dev" drops TCC.
+DEFAULT_IDENTITY="Muesli Local Dev"
+IDENTITY_NAME="${LOCAL_DEV_SIGN_IDENTITY:-${MUESLI_LOCAL_DEV_IDENTITY:-}}"
 KEYCHAIN="${MUESLI_LOCAL_DEV_KEYCHAIN:-$HOME/Library/Keychains/login.keychain-db}"
+
+if [[ -z "$IDENTITY_NAME" ]]; then
+  if security find-identity -v -p codesigning | grep -Fq "Sanjeed Local Dev"; then
+    IDENTITY_NAME="Sanjeed Local Dev"
+  else
+    IDENTITY_NAME="$DEFAULT_IDENTITY"
+  fi
+fi
 
 if security find-identity -v -p codesigning | grep -Fq "$IDENTITY_NAME"; then
   printf '%s\n' "$IDENTITY_NAME"

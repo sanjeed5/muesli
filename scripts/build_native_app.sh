@@ -611,7 +611,6 @@ else
   # no Team ID, so library validation would block dlopen of the bundled
   # frameworks/dylibs.
   LOCAL_SIGN_IDENTITY="-"
-  SHARED_LOCAL_IDENTITY="${LOCAL_DEV_SIGN_IDENTITY:-${MUESLI_LOCAL_DEV_IDENTITY:-Muesli Local Dev}}"
   if [[ -n "${MUESLI_SIGN_IDENTITY:-}" ]]; then
     LOCAL_SIGN_IDENTITY="$MUESLI_SIGN_IDENTITY"
     if ! security find-identity -v -p codesigning | grep -Fq "$LOCAL_SIGN_IDENTITY"; then
@@ -619,10 +618,10 @@ else
       exit 1
     fi
     echo "Local signing with MUESLI_SIGN_IDENTITY=$LOCAL_SIGN_IDENTITY (MUESLI_SKIP_SIGN=1)..."
-  elif security find-identity -v -p codesigning | grep -Fq "$SHARED_LOCAL_IDENTITY"; then
-    LOCAL_SIGN_IDENTITY="$SHARED_LOCAL_IDENTITY"
+  elif LOCAL_SIGN_IDENTITY="$("$ROOT/scripts/ensure_local_dev_identity.sh")"; then
     echo "Local signing with $LOCAL_SIGN_IDENTITY (stable TCC identity)..."
   else
+    LOCAL_SIGN_IDENTITY="-"
     echo "Ad-hoc signing for local dev (MUESLI_SKIP_SIGN=1; no Developer ID)..."
   fi
   ENTITLEMENTS="${MUESLI_ENTITLEMENTS:-$ROOT/scripts/Muesli.entitlements}"

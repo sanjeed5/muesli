@@ -169,7 +169,7 @@ struct DictationsView: View {
         }
         return appState.config.resolvedOnboardingUseCase.includesVoiceNotes
             ? "Click Record Voice Note to capture your first note"
-            : "Hold \(appState.config.dictationHotkey.label) to start dictating"
+            : DictationHotkeyCopy.idleHoverPrompt(hotkeyLabel: appState.config.dictationHotkey.label)
     }
 
     private var emptyStateTitle: String {

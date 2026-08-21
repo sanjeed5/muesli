@@ -838,7 +838,6 @@ struct AppConfigTests {
         #expect(config.enableComputerUsePlanner == true)
         #expect(config.computerUsePlannerModel.isEmpty)
         #expect(config.computerUseTimeoutSeconds == 120)
-        #expect(config.dictationHotkeyMode == .hybrid)
         #expect(config.hotkeyTriggerThresholdMS == HotkeyTriggerTiming.defaultThresholdMilliseconds)
         #expect(config.computerUseHotkeyTriggerThresholdMS == HotkeyTriggerTiming.defaultThresholdMilliseconds)
         #expect(config.meetingRecordingHotkeyTriggerThresholdMS == HotkeyTriggerTiming.defaultMeetingThresholdMilliseconds)
@@ -1018,7 +1017,6 @@ struct AppConfigTests {
         config.enableComputerUsePlanner = false
         config.computerUsePlannerModel = "gpt-5.4"
         config.computerUseTimeoutSeconds = 180
-        config.dictationHotkeyMode = .toggle
         config.hotkeyTriggerThresholdMS = 125
         config.computerUseHotkeyTriggerThresholdMS = 350
         config.meetingRecordingHotkeyTriggerThresholdMS = 900
@@ -1101,7 +1099,6 @@ struct AppConfigTests {
         #expect(decoded.enableComputerUsePlanner == false)
         #expect(decoded.computerUsePlannerModel == "gpt-5.4")
         #expect(decoded.computerUseTimeoutSeconds == 180)
-        #expect(decoded.dictationHotkeyMode == .toggle)
         #expect(decoded.hotkeyTriggerThresholdMS == 125)
         #expect(decoded.computerUseHotkeyTriggerThresholdMS == 350)
         #expect(decoded.meetingRecordingHotkeyTriggerThresholdMS == 900)
@@ -1147,13 +1144,6 @@ struct AppConfigTests {
         #expect(decoded.enableAutomaticDiagnosticIssuePrompts == false)
     }
 
-    @Test("missing dictation hotkey mode defaults to hybrid")
-    func missingDictationHotkeyModeDefaultsToHybrid() throws {
-        let decoded = try JSONDecoder().decode(AppConfig.self, from: Data("{}".utf8))
-
-        #expect(decoded.dictationHotkeyMode == .hybrid)
-    }
-
     @Test("JSON coding keys use snake_case")
     func snakeCaseKeys() throws {
         var config = AppConfig()
@@ -1170,7 +1160,6 @@ struct AppConfigTests {
         #expect(json["enable_computer_use_planner"] != nil)
         #expect(json["computer_use_planner_model"] != nil)
         #expect(json["computer_use_timeout_seconds"] != nil)
-        #expect(json["dictation_hotkey_mode"] != nil)
         #expect(json["hotkey_trigger_threshold_ms"] != nil)
         #expect(json["computer_use_hotkey_trigger_threshold_ms"] != nil)
         #expect(json["meeting_recording_hotkey_trigger_threshold_ms"] != nil)
@@ -1270,7 +1259,6 @@ struct AppConfigTests {
         #expect(config.enableComputerUsePlanner == true)
         #expect(config.computerUsePlannerModel.isEmpty)
         #expect(config.computerUseTimeoutSeconds == 120)
-        #expect(config.dictationHotkeyMode == .hybrid)
         #expect(config.hotkeyTriggerThresholdMS == HotkeyTriggerTiming.defaultThresholdMilliseconds)
         #expect(config.computerUseHotkeyTriggerThresholdMS == HotkeyTriggerTiming.defaultThresholdMilliseconds)
         #expect(config.meetingRecordingHotkeyTriggerThresholdMS == HotkeyTriggerTiming.defaultMeetingThresholdMilliseconds)
@@ -2207,7 +2195,7 @@ struct HotkeyMonitorTests {
     func hybridShortTapStartsHandsFreeDictation() {
         let scheduler = ManualHotkeyScheduler()
         let monitor = scheduler.makeMonitor(startDelay: 0.25)
-        monitor.activationMode = .hybrid
+        monitor.startsOnTap = true
         var toggleStartCount = 0
         var toggleStopCount = 0
         var startCount = 0
@@ -2233,7 +2221,7 @@ struct HotkeyMonitorTests {
     func hybridSecondTapStopsHandsFreeDictation() {
         let scheduler = ManualHotkeyScheduler()
         let monitor = scheduler.makeMonitor(startDelay: 0.25)
-        monitor.activationMode = .hybrid
+        monitor.startsOnTap = true
         var toggleStopCount = 0
         monitor.onToggleStart = {}
         monitor.onToggleStop = { toggleStopCount += 1 }
@@ -2254,7 +2242,7 @@ struct HotkeyMonitorTests {
     func hybridHoldPastStartDelayStopsOnRelease() {
         let scheduler = ManualHotkeyScheduler()
         let monitor = scheduler.makeMonitor(prepareDelay: 0.05, startDelay: 0.10)
-        monitor.activationMode = .hybrid
+        monitor.startsOnTap = true
         var toggleStartCount = 0
         var toggleStopCount = 0
         var startCount = 0
@@ -2281,7 +2269,7 @@ struct HotkeyMonitorTests {
     func hybridKeyBounceWhileHoldingDoesNotStopRecording() {
         let scheduler = ManualHotkeyScheduler()
         let monitor = scheduler.makeMonitor(startDelay: 0.10)
-        monitor.activationMode = .hybrid
+        monitor.startsOnTap = true
         var toggleStartCount = 0
         var toggleStopCount = 0
         monitor.onToggleStart = { toggleStartCount += 1 }
@@ -2304,7 +2292,7 @@ struct HotkeyMonitorTests {
     func hybridReleaseJustUnderHoldThresholdStaysHandsFree() {
         let scheduler = ManualHotkeyScheduler()
         let monitor = scheduler.makeMonitor(startDelay: 0.25)
-        monitor.activationMode = .hybrid
+        monitor.startsOnTap = true
         var toggleStopCount = 0
         monitor.onToggleStart = {}
         monitor.onToggleStop = { toggleStopCount += 1 }
@@ -2323,7 +2311,7 @@ struct HotkeyMonitorTests {
     func hybridReleaseAtHoldThresholdStopsOnRelease() {
         let scheduler = ManualHotkeyScheduler()
         let monitor = scheduler.makeMonitor(startDelay: 0.25)
-        monitor.activationMode = .hybrid
+        monitor.startsOnTap = true
         var toggleStopCount = 0
         monitor.onToggleStart = {}
         monitor.onToggleStop = { toggleStopCount += 1 }
@@ -2342,7 +2330,7 @@ struct HotkeyMonitorTests {
     func hybridIgnoresDoubleTapWhenEnabled() {
         let scheduler = ManualHotkeyScheduler()
         let monitor = scheduler.makeMonitor(startDelay: 0.25, doubleTapWindow: 0.35)
-        monitor.activationMode = .hybrid
+        monitor.startsOnTap = true
         monitor.doubleTapEnabled = true
         var toggleStartCount = 0
         var toggleStopCount = 0
@@ -2366,7 +2354,7 @@ struct HotkeyMonitorTests {
     func failedHybridStartDoesNotStayHandsFree() {
         let scheduler = ManualHotkeyScheduler()
         let monitor = scheduler.makeMonitor(startDelay: 0.25)
-        monitor.activationMode = .hybrid
+        monitor.startsOnTap = true
         var becameHandsFree = 0
         monitor.onToggleStart = { monitor.markHybridStartFailed() }
         monitor.onBecameHandsFree = { becameHandsFree += 1 }
@@ -2384,7 +2372,7 @@ struct HotkeyMonitorTests {
     func hybridOtherKeyAfterStartTranscribesInsteadOfDiscarding() {
         let scheduler = ManualHotkeyScheduler()
         let monitor = scheduler.makeMonitor(startDelay: 0.25)
-        monitor.activationMode = .hybrid
+        monitor.startsOnTap = true
         var toggleStartCount = 0
         var toggleStopCount = 0
         var cancelCount = 0
@@ -2396,6 +2384,29 @@ struct HotkeyMonitorTests {
         monitor.handleKeyDown(keyCode: 8)
 
         #expect(toggleStartCount == 1)
+        #expect(toggleStopCount == 1)
+        #expect(cancelCount == 0)
+        #expect(!monitor.isToggleRecording)
+    }
+
+    @Test("hybrid other modifier flags do not stop recording")
+    @MainActor
+    func hybridOtherModifierFlagsDoNotStopRecording() {
+        let scheduler = ManualHotkeyScheduler()
+        let monitor = scheduler.makeMonitor(startDelay: 0.25)
+        monitor.startsOnTap = true
+        var toggleStopCount = 0
+        var cancelCount = 0
+        monitor.onToggleStart = {}
+        monitor.onToggleStop = { toggleStopCount += 1 }
+        monitor.onCancel = { cancelCount += 1 }
+
+        monitor.handleFlagsChanged(keyCode: 55, flags: .command)
+        monitor.handleFlagsChanged(keyCode: 63, flags: [.command, .function])
+        scheduler.advance(by: 0.40)
+        monitor.handleFlagsChanged(keyCode: 55, flags: [])
+        scheduler.advance(by: HotkeyTriggerTiming.hybridReleaseDebounce)
+
         #expect(toggleStopCount == 1)
         #expect(cancelCount == 0)
         #expect(!monitor.isToggleRecording)
